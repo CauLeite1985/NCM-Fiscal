@@ -1,0 +1,6 @@
+{
+  "name": "NCM Fiscal",
+  "description": "Sistema inteligente de classificação fiscal de produtos por NCM e Vínculo Fiscal (Tributado ou Substituição Tributária) por UF, com importação de planilhas CSV/XLS e cardápios em PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

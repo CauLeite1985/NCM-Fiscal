@@ -1,0 +1,271 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'claudio.softcom@gmail.com';
+    }
+
+    function isApprovedUser() {
+      return isBootstrappedAdmin() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved'
+      );
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerified() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved'
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUser(data, userId) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'role', 'status', 'approvedBy', 'createdAt', 'updatedAt'])
+        && data.uid is string && data.uid == userId && isValidId(data.uid)
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.email is string && data.email.size() >= 5 && data.email.size() <= 160
+        && data.role in ['admin', 'operator']
+        && data.status in ['pending', 'approved', 'rejected']
+        && (!('approvedBy' in data) || (data.approvedBy is string && data.approvedBy.size() <= 160))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBatch(data, batchId) {
+      return data.keys().hasAll([
+          'id', 'ownerId', 'ownerName', 'title', 'sourceType', 'uf',
+          'totalProducts', 'classifiedCount', 'stCount', 'tributadoCount',
+          'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'ownerId', 'ownerName', 'title', 'sourceType', 'uf',
+          'totalProducts', 'classifiedCount', 'stCount', 'tributadoCount',
+          'status', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == batchId && isValidId(data.id)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && data.ownerName is string && data.ownerName.size() >= 1 && data.ownerName.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 180
+        && data.sourceType in ['csv', 'xls', 'pdf', 'manual']
+        && data.uf is string && data.uf.size() == 2 && data.uf.matches('^[A-Z]{2}$')
+        && data.totalProducts is int && data.totalProducts >= 0 && data.totalProducts <= 50000
+        && data.classifiedCount is int && data.classifiedCount >= 0 && data.classifiedCount <= 50000
+        && data.stCount is int && data.stCount >= 0 && data.stCount <= 50000
+        && data.tributadoCount is int && data.tributadoCount >= 0 && data.tributadoCount <= 50000
+        && data.status in ['draft', 'reviewed', 'exported']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidBatchItem(data, batchId, itemId) {
+      return data.keys().hasAll([
+          'id', 'batchId', 'ownerId', 'rowIndex', 'description', 'category', 'price', 'ncm',
+          'ncmDescription', 'ncmSource', 'fiscalLink', 'fiscalLinkSource',
+          'fiscalReason', 'barcode', 'reviewed', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'batchId', 'ownerId', 'rowIndex', 'description', 'category', 'price', 'ncm',
+          'ncmDescription', 'ncmSource', 'fiscalLink', 'fiscalLinkSource',
+          'fiscalReason', 'barcode', 'reviewed', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id == itemId && isValidId(data.id)
+        && data.batchId is string && data.batchId == batchId && isValidId(data.batchId)
+        && data.ownerId is string && isValidId(data.ownerId)
+        && data.rowIndex is int && data.rowIndex >= 0 && data.rowIndex <= 50000
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 300
+        && data.category is string && data.category.size() <= 100
+        && data.price is string && data.price.size() <= 24
+        && data.ncm is string && data.ncm.size() <= 12
+        && data.ncmDescription is string && data.ncmDescription.size() <= 300
+        && data.ncmSource in ['original', 'suggested', 'manual', 'empty']
+        && data.fiscalLink in ['Tributado', 'Substituição Tributária', '']
+        && data.fiscalLinkSource in ['original', 'auto_uf', 'manual', 'empty']
+        && data.fiscalReason is string && data.fiscalReason.size() <= 300
+        && data.barcode is string && data.barcode.size() <= 40
+        && data.reviewed is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidNcmMetadata(data, docId) {
+      return data.keys().hasAll([
+          'id', 'sourceUrl', 'actReference', 'totalEntries',
+          'updatedByUid', 'updatedByName', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'sourceUrl', 'actReference', 'totalEntries',
+          'updatedByUid', 'updatedByName', 'updatedAt'
+        ])
+        && data.id is string && data.id == docId && isValidId(data.id)
+        && data.sourceUrl is string && data.sourceUrl.size() >= 1 && data.sourceUrl.size() <= 300
+        && data.actReference is string && data.actReference.size() <= 160
+        && data.totalEntries is int && data.totalEntries >= 0 && data.totalEntries <= 200000
+        && data.updatedByUid is string && data.updatedByUid == request.auth.uid && isValidId(data.updatedByUid)
+        && data.updatedByName is string && data.updatedByName.size() >= 1 && data.updatedByName.size() <= 120
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection: /users/{userId} ---
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isBootstrappedAdmin();
+
+      allow create: if isSignedIn()
+        && isValidId(userId)
+        && request.auth.uid == userId
+        && isValidUser(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          (isBootstrappedAdmin() && incoming().role == 'admin' && incoming().status == 'approved' && incoming().email == 'claudio.softcom@gmail.com') ||
+          (incoming().role == 'operator' && incoming().status == 'pending' && incoming().email == request.auth.token.email)
+        );
+
+      allow update: if isSignedIn()
+        && isValidId(userId)
+        && isValidUser(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'approvedBy', 'updatedAt', 'name'])) ||
+          (request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt']))
+        );
+
+      allow delete: if isAdmin() && isValidId(userId) && existing().email != 'claudio.softcom@gmail.com';
+    }
+
+    // --- Collection: /batches/{batchId} ---
+    match /batches/{batchId} {
+      allow get: if isApprovedUser() && isValidId(batchId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isApprovedUser()
+        && isValidId(batchId)
+        && isValidBatch(incoming(), batchId)
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isApprovedUser()
+        && isValidId(batchId)
+        && isValidBatch(incoming(), batchId)
+        && incoming().id == existing().id
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (existing().ownerId == request.auth.uid || isAdmin())
+        && (
+          isAdmin() ||
+          (existing().status != 'exported' && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'uf', 'totalProducts', 'classifiedCount', 'stCount',
+            'tributadoCount', 'status', 'updatedAt'
+          ]))
+        );
+
+      allow delete: if isApprovedUser() && isValidId(batchId) && (existing().ownerId == request.auth.uid || isAdmin());
+
+      // --- Subcollection: /batches/{batchId}/items/{itemId} ---
+      match /items/{itemId} {
+        allow get: if isApprovedUser()
+          && isValidId(batchId)
+          && isValidId(itemId)
+          && (
+            get(/databases/$(database)/documents/batches/$(batchId)).data.ownerId == request.auth.uid ||
+            isAdmin()
+          );
+
+        allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+        allow create: if isApprovedUser()
+          && isValidId(batchId)
+          && isValidId(itemId)
+          && isValidBatchItem(incoming(), batchId, itemId)
+          && incoming().ownerId == request.auth.uid
+          && exists(/databases/$(database)/documents/batches/$(batchId))
+          && get(/databases/$(database)/documents/batches/$(batchId)).data.ownerId == request.auth.uid
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+
+        allow update: if isApprovedUser()
+          && isValidId(batchId)
+          && isValidId(itemId)
+          && isValidBatchItem(incoming(), batchId, itemId)
+          && incoming().id == existing().id
+          && incoming().batchId == existing().batchId
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && (
+            get(/databases/$(database)/documents/batches/$(batchId)).data.ownerId == request.auth.uid ||
+            isAdmin()
+          )
+          && (
+            isAdmin() ||
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'rowIndex', 'description', 'category', 'price', 'ncm', 'ncmDescription', 'ncmSource',
+              'fiscalLink', 'fiscalLinkSource', 'fiscalReason', 'barcode',
+              'reviewed', 'updatedAt'
+            ])
+          );
+
+        allow delete: if isApprovedUser()
+          && isValidId(batchId)
+          && isValidId(itemId)
+          && (
+            get(/databases/$(database)/documents/batches/$(batchId)).data.ownerId == request.auth.uid ||
+            isAdmin()
+          );
+      }
+    }
+
+    // --- Collection: /ncmMetadata/{docId} ---
+    match /ncmMetadata/{docId} {
+      allow get: if isApprovedUser() && isValidId(docId);
+      allow list: if false;
+
+      allow create, update: if isApprovedUser()
+        && isValidId(docId)
+        && isValidNcmMetadata(incoming(), docId)
+        && incoming().updatedAt == request.time;
+
+      allow delete: if false;
+    }
+  }
+}

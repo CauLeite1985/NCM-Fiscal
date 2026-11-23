@@ -1,0 +1,294 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Sistema de controle de acesso de usuários com fluxo de aprovação pelo administrador.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID do usuário."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Nome completo do usuário."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 5,
+          "maxLength": 160,
+          "description": "E-mail corporativo ou pessoal do usuário."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "operator"],
+          "description": "Perfil de permissão no sistema."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"],
+          "description": "Status de aceite no controle de acesso."
+        },
+        "approvedBy": {
+          "type": "string",
+          "maxLength": 160,
+          "description": "E-mail ou UID do administrador que aprovou ou recusou o acesso."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp de criação do cadastro."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp da última atualização."
+        }
+      },
+      "required": ["uid", "name", "email", "role", "status", "createdAt", "updatedAt"]
+    },
+    "FiscalBatch": {
+      "title": "FiscalBatch",
+      "description": "Lote de classificação fiscal importado via planilha ou PDF.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 180
+        },
+        "sourceType": {
+          "type": "string",
+          "enum": ["csv", "xls", "pdf", "manual"]
+        },
+        "uf": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 2,
+          "pattern": "^[A-Z]{2}$"
+        },
+        "totalProducts": {
+          "type": "integer"
+        },
+        "classifiedCount": {
+          "type": "integer"
+        },
+        "stCount": {
+          "type": "integer"
+        },
+        "tributadoCount": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "reviewed", "exported"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "ownerId",
+        "ownerName",
+        "title",
+        "sourceType",
+        "uf",
+        "totalProducts",
+        "classifiedCount",
+        "stCount",
+        "tributadoCount",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FiscalBatchItem": {
+      "title": "FiscalBatchItem",
+      "description": "Produto individual dentro de um lote de classificação fiscal.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "batchId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "rowIndex": {
+          "type": "integer"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Categoria do produto ou seção do cardápio (ex: Bebidas, Petiscos, Pizzas)."
+        },
+        "price": {
+          "type": "string",
+          "maxLength": 24,
+          "description": "Preço do produto em reais (R$)."
+        },
+        "ncm": {
+          "type": "string",
+          "maxLength": 12
+        },
+        "ncmDescription": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "ncmSource": {
+          "type": "string",
+          "enum": ["original", "suggested", "manual", "empty"]
+        },
+        "fiscalLink": {
+          "type": "string",
+          "enum": ["Tributado", "Substituição Tributária", ""]
+        },
+        "fiscalLinkSource": {
+          "type": "string",
+          "enum": ["original", "auto_uf", "manual", "empty"]
+        },
+        "fiscalReason": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "barcode": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "reviewed": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "batchId",
+        "ownerId",
+        "rowIndex",
+        "description",
+        "category",
+        "price",
+        "ncm",
+        "ncmDescription",
+        "ncmSource",
+        "fiscalLink",
+        "fiscalLinkSource",
+        "fiscalReason",
+        "barcode",
+        "reviewed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "NcmMetadata": {
+      "title": "NcmMetadata",
+      "description": "Metadados de sincronização da tabela NCM oficial da Receita Federal.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sourceUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "actReference": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "totalEntries": {
+          "type": "integer"
+        },
+        "updatedByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "updatedByName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sourceUrl", "actReference", "totalEntries", "updatedByUid", "updatedByName", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Cadastro de usuários e status de aprovação para controle de acesso."
+    },
+    "/batches/{batchId}": {
+      "schema": { "$ref": "#/entities/FiscalBatch" },
+      "description": "Lotes de produtos importados e classificados fiscalmente."
+    },
+    "/batches/{batchId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/FiscalBatchItem" },
+      "description": "Itens individuais de produto pertencentes a um lote fiscal."
+    },
+    "/ncmMetadata/{docId}": {
+      "schema": { "$ref": "#/entities/NcmMetadata" },
+      "description": "Registro da última sincronização da Tabela NCM oficial da Receita Federal."
+    }
+  }
+}
